@@ -362,6 +362,8 @@ private:
   JITSymbolFlags Flags;
 };
 
+class LegacyJITSymbolResolver;
+
 /// Symbol resolution interface.
 ///
 /// Allows symbol flags and addresses to be looked up by name.
@@ -392,6 +394,8 @@ public:
 
   /// Specify if this resolver can return valid symbols with zero value.
   virtual bool allowsZeroSymbols() { return false; }
+
+  virtual LegacyJITSymbolResolver* getLegacyJITSymbolResolver() { return nullptr; }
 
 private:
   virtual void anchor();
@@ -430,6 +434,8 @@ public:
   /// skip all relocations for that symbol, and the client will be responsible
   /// for handling them manually.
   virtual JITSymbol findSymbol(const std::string &Name) = 0;
+
+  LegacyJITSymbolResolver* getLegacyJITSymbolResolver() override { return this; }
 
 private:
   void anchor() override;

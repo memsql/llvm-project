@@ -128,6 +128,8 @@ void RuntimeDyldImpl::resolveRelocations() {
   });
 
   // First, resolve relocations associated with external symbols.
+  if (TLSResolver)
+    resolveExternalTLSSymbols();
   if (auto Err = resolveExternalSymbols()) {
     HasError = true;
     ErrorStr = toString(std::move(Err));
@@ -953,16 +955,23 @@ void RuntimeDyldImpl::addRelocationForSection(const RelocationEntry &RE,
 }
 
 void RuntimeDyldImpl::addRelocationForSymbol(const RelocationEntry &RE,
-                                             StringRef SymbolName) {
+                                             StringRef SymbolName,
+                                             bool isTLS) {
   // Relocation by symbol.  If the symbol is found in the global symbol table,
   // create an appropriate section relocation.  Otherwise, add it to
   // ExternalSymbolRelocations.
   RTDyldSymbolTable::const_iterator Loc = GlobalSymbolTable.find(SymbolName);
   if (Loc == GlobalSymbolTable.end()) {
-    ExternalSymbolRelocations[SymbolName].push_back(RE);
+    if (isTLS) {
+      ExternalTLSRelocations[SymbolName].push_back(RE);
+    } else {
+      ExternalSymbolRelocations[SymbolName].push_back(RE);
+    }
   } else {
     assert(!SymbolName.empty() &&
            "Empty symbol should not be in GlobalSymbolTable");
+    assert(!isTLS && "Declaring thread local variables in loaded objects "
+                     "is not yet supported.");
     // Copy the RE since we want to modify its addend.
     RelocationEntry RECopy = RE;
     const auto &SymInfo = Loc->second;
@@ -1113,6 +1122,9 @@ void RuntimeDyldImpl::resolveRelocationList(const RelocationList &Relocs,
 
 void RuntimeDyldImpl::applyExternalSymbolRelocations(
     const StringMap<JITEvaluatedSymbol> ExternalSymbolMap) {
+  if (TLSResolver)
+    resolveExternalTLSSymbols();
+
   for (auto &RelocKV : ExternalSymbolRelocations) {
     StringRef Name = RelocKV.first();
     RelocationList &Relocs = RelocKV.second;
@@ -1158,10 +1170,14 @@ void RuntimeDyldImpl::applyExternalSymbolRelocations(
         resolveRelocationList(Relocs, Addr);
       }
     }
+    // Resolving this symbol may have loaded additional modules whose TLS
+    // Relocations need to be resolved.
+    if (TLSResolver)
+      resolveExternalTLSSymbols();
   }
   ExternalSymbolRelocations.clear();
 }
-
+#pragma clang optimize off
 Error RuntimeDyldImpl::resolveExternalSymbols() {
   StringMap<JITEvaluatedSymbol> ExternalSymbolMap;
 
@@ -1217,6 +1233,7 @@ Error RuntimeDyldImpl::resolveExternalSymbols() {
 
   return Error::success();
 }
+#pragma clang optimize on
 
 void RuntimeDyldImpl::finalizeAsync(
     std::unique_ptr<RuntimeDyldImpl> This,
@@ -1297,8 +1314,9 @@ void JITSymbolResolver::anchor() {}
 void LegacyJITSymbolResolver::anchor() {}
 
 RuntimeDyld::RuntimeDyld(RuntimeDyld::MemoryManager &MemMgr,
-                         JITSymbolResolver &Resolver)
-    : MemMgr(MemMgr), Resolver(Resolver) {
+                         JITSymbolResolver &Resolver,
+                         RuntimeDyld::TLSSymbolResolver *TLSResolver)
+    : MemMgr(MemMgr), Resolver(Resolver), TLSResolver(TLSResolver) {
   // FIXME: There's a potential issue lurking here if a single instance of
   // RuntimeDyld is used to load multiple objects.  The current implementation
   // associates a single memory manager with a RuntimeDyld instance.  Even
@@ -1327,8 +1345,12 @@ static std::unique_ptr<RuntimeDyldELF>
 createRuntimeDyldELF(Triple::ArchType Arch, RuntimeDyld::MemoryManager &MM,
                      JITSymbolResolver &Resolver, bool ProcessAllSections,
                      RuntimeDyld::NotifyStubEmittedFunction NotifyStubEmitted) {
+  LegacyJITSymbolResolver *SR = Resolver.getLegacyJITSymbolResolver();
+  assert(SR != nullptr);
+  std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver =
+          std::make_unique<TLSSymbolResolverGLibCELF>(SR);
   std::unique_ptr<RuntimeDyldELF> Dyld =
-      RuntimeDyldELF::create(Arch, MM, Resolver);
+      RuntimeDyldELF::create(Arch, MM, Resolver, std::move(TLSResolver));
   Dyld->setProcessAllSections(ProcessAllSections);
   Dyld->setNotifyStubEmitted(std::move(NotifyStubEmitted));
   return Dyld;

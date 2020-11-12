@@ -1,8 +1,4 @@
 {
-  "phabricator.uri" : "https://reviews.llvm.org/",
-  "repository.callsign" : "G",
-  "conduit_uri" : "https://reviews.llvm.org/",
-  "base": "git:HEAD^",
-  "arc.land.onto.default": "main",
-  "arc.land.onto": ["main"]
+  "project_id" : "memsql",
+  "conduit_uri" : "https:\/\/grizzly.internal.memcompute.com\/api\/"
 }

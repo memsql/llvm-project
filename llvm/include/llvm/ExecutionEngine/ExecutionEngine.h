@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
+#include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Object/Binary.h"
@@ -139,6 +140,7 @@ protected:
       std::unique_ptr<Module> M, std::string *ErrorStr,
       std::shared_ptr<MCJITMemoryManager> MM,
       std::shared_ptr<LegacyJITSymbolResolver> SR,
+      std::shared_ptr<RuntimeDyld::TLSSymbolResolver> TLSSR,
       std::unique_ptr<TargetMachine> TM);
 
   static ExecutionEngine *(*InterpCtor)(std::unique_ptr<Module> M,
@@ -539,6 +541,7 @@ private:
   CodeGenOpt::Level OptLevel;
   std::shared_ptr<MCJITMemoryManager> MemMgr;
   std::shared_ptr<LegacyJITSymbolResolver> Resolver;
+  std::shared_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver;
   TargetOptions Options;
   Optional<Reloc::Model> RelocModel;
   Optional<CodeModel::Model> CMModel;
@@ -577,6 +580,9 @@ public:
   setMemoryManager(std::unique_ptr<MCJITMemoryManager> MM);
 
   EngineBuilder &setSymbolResolver(std::unique_ptr<LegacyJITSymbolResolver> SR);
+
+  EngineBuilder&
+  setTLSSymbolResolver(std::unique_ptr<RuntimeDyld::TLSSymbolResolver> SR);
 
   /// setErrorStr - Set the error string to write to on error.  This option
   /// defaults to NULL.

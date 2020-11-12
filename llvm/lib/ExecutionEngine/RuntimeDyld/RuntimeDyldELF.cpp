@@ -214,8 +214,9 @@ LoadedELFObjectInfo::getObjectForDebug(const ObjectFile &Obj) const {
 namespace llvm {
 
 RuntimeDyldELF::RuntimeDyldELF(RuntimeDyld::MemoryManager &MemMgr,
-                               JITSymbolResolver &Resolver)
-    : RuntimeDyldImpl(MemMgr, Resolver), GOTSectionID(0), CurrentGOTIndex(0) {}
+                               JITSymbolResolver &Resolver,
+                               std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver)
+    : RuntimeDyldImpl(MemMgr, Resolver, std::move(TLSResolver)), GOTSectionID(0), CurrentGOTIndex(0) {}
 RuntimeDyldELF::~RuntimeDyldELF() = default;
 
 void RuntimeDyldELF::registerEHFrames() {
@@ -232,10 +233,11 @@ void RuntimeDyldELF::registerEHFrames() {
 std::unique_ptr<RuntimeDyldELF>
 llvm::RuntimeDyldELF::create(Triple::ArchType Arch,
                              RuntimeDyld::MemoryManager &MemMgr,
-                             JITSymbolResolver &Resolver) {
+                             JITSymbolResolver &Resolver,
+                             std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver) {
   switch (Arch) {
   default:
-    return std::make_unique<RuntimeDyldELF>(MemMgr, Resolver);
+    return std::make_unique<RuntimeDyldELF>(MemMgr, Resolver, std::move(TLSResolver));
   case Triple::mips:
   case Triple::mipsel:
   case Triple::mips64:
@@ -371,6 +373,32 @@ void RuntimeDyldELF::resolveX86_64Relocation(const SectionEntry &Section,
         TruncValue;
     break;
   }
+  }
+}
+
+void RuntimeDyldELF::resolveX86_64RelocationTLS(const SectionEntry &Section, uint64_t Offset,
+                                                       RuntimeDyldELF::TLSSymbolInfoELF Value,
+                                                       uint32_t Type)
+{
+  switch (Type) {
+    default:
+    llvm_unreachable("TLS Relocation type not implemented yet!");
+    break;
+    case ELF::R_X86_64_DTPMOD64:
+    support::ulittle64_t::ref(Section.getAddressWithOffset(Offset)) = Value.getModInfo().ModuleID;
+    break;
+    case ELF::R_X86_64_TPOFF64:
+    support::ulittle64_t::ref(Section.getAddressWithOffset(Offset)) = Value.getModInfo().tpoff + Value.getOffset();
+    break;
+    case ELF::R_X86_64_DTPOFF64:
+    support::ulittle64_t::ref(Section.getAddressWithOffset(Offset)) = Value.getOffset();
+    break;
+    case ELF::R_X86_64_TPOFF32:
+    assert(Value.getExecOffset() >= INT32_MIN &&
+         Value.getExecOffset() <= INT32_MAX);
+    support::little32_t::ref(Section.getAddress() + Offset) =
+    static_cast<int32_t>(Value.getExecOffset());
+    break;
   }
 }
 
@@ -1110,6 +1138,54 @@ uint32_t RuntimeDyldELF::getMatchingLoRelocation(uint32_t RelType,
     break;
   }
   return ELF::R_MIPS_NONE;
+}
+
+void RuntimeDyldELF::resolveRelocationTLS(const RelocationEntry &RE,
+                                                RuntimeDyldELF::TLSSymbolInfoELF Value)
+{
+  const SectionEntry &Section = Sections[RE.SectionID];
+  switch (Arch) {
+  case Triple::x86_64:
+    resolveX86_64RelocationTLS(Section,RE.Offset,Value,RE.RelType);
+    break;
+  default:
+    llvm_unreachable("TLS Support not implemented for this CPU type");
+    break;
+  }
+}
+
+void RuntimeDyldELF::resolveExternalTLSSymbols()
+{
+  const TLSSymbolResolverELF *SR = static_cast<const TLSSymbolResolverELF*>(TLSResolver.get());
+
+  while (!ExternalTLSRelocations.empty()) {
+    StringMap<RelocationList>::iterator i = ExternalTLSRelocations.begin();
+    StringRef Name = i->first();
+    RelocationList &Relocs = i->second;
+    assert(Name.size() != 0 && "TLS relocations should not be absolute.");
+
+    TLSSymbolInfoELF Value = SR->findTLSSymbolELF(Name.str());
+    for (unsigned idx = 0, e = Relocs.size(); idx != e; ++idx) {
+      const RelocationEntry &RE = Relocs[idx];
+      // Ignore relocations for sections that were not loaded
+      if (Sections[RE.SectionID].getAddress() == nullptr)
+        continue;
+      resolveRelocationTLS(RE, Value);
+    }
+
+    ExternalTLSRelocations.erase(i);
+  }
+
+  // Some implementations may want to provide a custom get_addr function.
+  // Do the override here.
+  uint64_t AddrOverride = SR->GetAddrOverride();
+  if (AddrOverride != 0) {
+    auto i = ExternalSymbolRelocations.find("__tls_get_addr");
+    if (i != ExternalSymbolRelocations.end()) {
+      resolveRelocationList(i->second, AddrOverride);
+      ExternalSymbolRelocations.erase(i);
+    }
+  }
 }
 
 // Sometimes we don't need to create thunk for a branch.

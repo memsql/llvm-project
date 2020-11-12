@@ -38,7 +38,7 @@ protected:
   RuntimeDyldCOFF(RuntimeDyld::MemoryManager &MemMgr,
                   JITSymbolResolver &Resolver, unsigned PointerSize,
                   uint32_t PointerReloc)
-      : RuntimeDyldImpl(MemMgr, Resolver), PointerSize(PointerSize),
+      : RuntimeDyldImpl(MemMgr, Resolver, nullptr), PointerSize(PointerSize),
         PointerReloc(PointerReloc) {
     assert((PointerSize == 4 || PointerSize == 8) && "Unexpected pointer size");
   }
