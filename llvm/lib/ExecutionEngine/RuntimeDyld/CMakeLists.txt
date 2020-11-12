@@ -6,6 +6,7 @@ add_llvm_component_library(LLVMRuntimeDyld
   RuntimeDyldCOFF.cpp
   RuntimeDyldELF.cpp
   RuntimeDyldMachO.cpp
+  TLSSymbolResolverELF.cpp
   Targets/RuntimeDyldELFMips.cpp
 
   DEPENDS

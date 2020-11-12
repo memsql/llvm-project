@@ -23,7 +23,7 @@ public:
 
   RuntimeDyldELFMips(RuntimeDyld::MemoryManager &MM,
                      JITSymbolResolver &Resolver)
-      : RuntimeDyldELF(MM, Resolver) {}
+      : RuntimeDyldELF(MM, Resolver, nullptr) {}
 
   void resolveRelocation(const RelocationEntry &RE, uint64_t Value) override;
 
