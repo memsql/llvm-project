@@ -39,7 +39,7 @@ inline uint64_t GetTLSBase() {
 }
 
 RuntimeDyld::TLSSymbolInfo
-TLSSymbolResolverGLibCELF::findTLSSymbol(const std::string &Name) {
+TLSSymbolResolverGLibCELF::findTLSSymbol(const std::string &Name) const {
     // It would be lovely to have an API for this. If we
     // wanted to, we might be able to actually look at the
     // internal libc datastructures, but that seems risky if

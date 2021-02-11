@@ -49,9 +49,9 @@ public:
 
   class TLSSymbolResolverELF : public RuntimeDyld::TLSSymbolResolver {
   public:
-    virtual int64_t ExtraGOTAddend() { return 0; };
-    virtual uint64_t GetAddrOverride() { return 0; };
-    TLSSymbolInfoELF findTLSSymbolELF(const std::string &Name) { return TLSSymbolInfoELF(findTLSSymbol(Name)); }
+    virtual int64_t ExtraGOTAddend() const { return 0; };
+    virtual uint64_t GetAddrOverride() const { return 0; };
+    TLSSymbolInfoELF findTLSSymbolELF(const std::string &Name) const { return TLSSymbolInfoELF(findTLSSymbol(Name)); }
   };
 
 private:
@@ -200,13 +200,13 @@ private:
 public:
   RuntimeDyldELF(RuntimeDyld::MemoryManager &MemMgr,
                  JITSymbolResolver &Resolver,
-                 RuntimeDyld::TLSSymbolResolver *TLSResolver);
+                 std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver);
   ~RuntimeDyldELF() override;
 
   static std::unique_ptr<RuntimeDyldELF>
   create(Triple::ArchType Arch, RuntimeDyld::MemoryManager &MemMgr,
          JITSymbolResolver &Resolver,
-         RuntimeDyld::TLSSymbolResolver *TLSResolver);
+         std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver);
 
   std::unique_ptr<RuntimeDyld::LoadedObjectInfo>
   loadObject(const object::ObjectFile &O) override;
@@ -234,7 +234,7 @@ private:
     LegacyJITSymbolResolver *SR;
 public:
     TLSSymbolResolverGLibCELF(LegacyJITSymbolResolver *SR) : TLSSymbolResolverELF(), SR(SR) {};
-    RuntimeDyld::TLSSymbolInfo findTLSSymbol(const std::string &Name) override;
+    RuntimeDyld::TLSSymbolInfo findTLSSymbol(const std::string &Name) const override;
 };
 
 } // end namespace llvm

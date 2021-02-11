@@ -211,7 +211,7 @@ public:
 
     /// This method returns the an opaque object describing the variables location
     /// in thread-local (e.g. module ID and offset)
-    virtual TLSSymbolInfo findTLSSymbol(const std::string &Name) = 0;
+    virtual TLSSymbolInfo findTLSSymbol(const std::string &Name) const = 0;
   };
 
   /// Construct a RuntimeDyld instance.
