@@ -289,11 +289,12 @@ CXXNewExpr *CXXNewExpr::CreateEmpty(const ASTContext &Ctx, bool IsArray,
       CXXNewExpr(EmptyShell(), IsArray, NumPlacementArgs, IsParenTypeId);
 }
 
-bool CXXNewExpr::shouldNullCheckAllocation() const {
-  return getOperatorNew()
+bool CXXNewExpr::shouldNullCheckAllocation(const ASTContext &Ctx) const {
+  return (getOperatorNew()
              ->getType()
              ->castAs<FunctionProtoType>()
-             ->isNothrow() &&
+             ->isNothrow() ||
+          Ctx.getLangOpts().CheckNew) &&
          !getOperatorNew()->isReservedGlobalPlacementOperator();
 }
 

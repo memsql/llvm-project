@@ -709,14 +709,14 @@ void ExprEngine::VisitCXXNewAllocatorCall(const CXXNewExpr *CNE,
     // If this allocation function is not declared as non-throwing, failures
     // /must/ be signalled by exceptions, and thus the return value will never
     // be NULL. -fno-exceptions does not influence this semantics.
-    // FIXME: GCC has a -fcheck-new option, which forces it to consider the case
-    // where new can return NULL. If we end up supporting that option, we can
-    // consider adding a check for it here.
     // C++11 [basic.stc.dynamic.allocation]p3.
+    //
+    // -fcheck-new overwrites this behavior to always check for NULL. Check for
+    // the CheckNew option here.
     if (const FunctionDecl *FD = CNE->getOperatorNew()) {
       QualType Ty = FD->getType();
       if (const auto *ProtoType = Ty->getAs<FunctionProtoType>())
-        if (!ProtoType->isNothrow())
+        if (!ProtoType->isNothrow() && !getContext().getLangOpts().CheckNew)
           State = State->assume(RetVal.castAs<DefinedOrUnknownSVal>(), true);
     }
 
@@ -784,14 +784,14 @@ void ExprEngine::VisitCXXNewExpr(const CXXNewExpr *CNE, ExplodedNode *Pred,
     // If this allocation function is not declared as non-throwing, failures
     // /must/ be signalled by exceptions, and thus the return value will never
     // be NULL. -fno-exceptions does not influence this semantics.
-    // FIXME: GCC has a -fcheck-new option, which forces it to consider the case
-    // where new can return NULL. If we end up supporting that option, we can
-    // consider adding a check for it here.
     // C++11 [basic.stc.dynamic.allocation]p3.
+    //
+    // -fcheck-new overwrites this behavior to always check for NULL. Check for
+    // the CheckNew option here.
     if (FD) {
       QualType Ty = FD->getType();
       if (const auto *ProtoType = Ty->getAs<FunctionProtoType>())
-        if (!ProtoType->isNothrow())
+        if (!ProtoType->isNothrow() && !getContext().getLangOpts().CheckNew)
           if (auto dSymVal = symVal.getAs<DefinedOrUnknownSVal>())
             State = State->assume(*dSymVal, true);
     }

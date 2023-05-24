@@ -3248,7 +3248,9 @@ def falign_jumps_EQ : Joined<["-"], "falign-jumps=">, Group<clang_ignored_gcc_op
 // ignore it for now to avoid breaking builds that use it.
 def fdiagnostics_show_location_EQ : Joined<["-"], "fdiagnostics-show-location=">, Group<clang_ignored_f_Group>;
 
-defm fcheck_new : BooleanFFlag<"check-new">, Group<clang_ignored_f_Group>;
+def fcheck_new : Flag<["-"], "fcheck-new">, Group<f_Group>, Flags<[CC1Option]>;
+def fno_check_new : Flag<["-"], "fno-check-new">, Group<f_Group>;
+
 defm caller_saves : BooleanFFlag<"caller-saves">, Group<clang_ignored_gcc_optimization_f_Group>;
 defm reorder_blocks : BooleanFFlag<"reorder-blocks">, Group<clang_ignored_gcc_optimization_f_Group>;
 defm eliminate_unused_debug_types : BooleanFFlag<"eliminate-unused-debug-types">, Group<clang_ignored_f_Group>;

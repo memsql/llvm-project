@@ -344,6 +344,8 @@ LANGOPT(PaddingOnUnsignedFixedPoint, 1, 0,
 
 LANGOPT(RegisterStaticDestructors, 1, 1, "Register C++ static destructors")
 
+LANGOPT(CheckNew, 1, 0, "Check for nullptr returned by operator new")
+
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT
 #undef BENIGN_LANGOPT

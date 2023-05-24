@@ -10109,12 +10109,16 @@ Sema::CheckReturnValExpr(Expr *RetValExp, QualType lhsType,
   //   exception-specification fails to allocate storage, it shall return
   //   a null pointer. Any other allocation function that fails to allocate
   //   storage shall indicate failure only by throwing an exception [...]
+  //
+  // -fcheck-new overwrites this behavior to always check for NULL. Check for
+  // the CheckNew option here.
   if (FD) {
     OverloadedOperatorKind Op = FD->getOverloadedOperator();
     if (Op == OO_New || Op == OO_Array_New) {
       const FunctionProtoType *Proto
         = FD->getType()->castAs<FunctionProtoType>();
       if (!Proto->isNothrow(/*ResultIfDependent*/true) &&
+          !Context.getLangOpts().CheckNew &&
           CheckNonNullExpr(*this, RetValExp))
         Diag(ReturnLoc, diag::warn_operator_new_returns_null)
           << FD << getLangOpts().CPlusPlus11;
