@@ -1672,7 +1672,7 @@ llvm::Value *CodeGenFunction::EmitCXXNewExpr(const CXXNewExpr *E) {
   // function is allowed to return null (because it has a non-throwing
   // exception spec or is the reserved placement new) and we have an
   // interesting initializer will be running sanitizers on the initialization.
-  bool nullCheck = E->shouldNullCheckAllocation() &&
+  bool nullCheck = E->shouldNullCheckAllocation(getContext()) &&
                    (!allocType.isPODType(getContext()) || E->hasInitializer() ||
                     sanitizePerformTypeCheck());
 

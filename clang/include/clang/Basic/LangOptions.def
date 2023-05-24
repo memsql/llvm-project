@@ -425,6 +425,8 @@ ENUM_LANGOPT(ExtendIntArgs, ExtendArgsKind, 1, ExtendArgsKind::ExtendTo32,
              "Controls how scalar integer arguments are extended in calls "
              "to unprototyped and varargs functions")
 
+LANGOPT(CheckNew, 1, 0, "Check for nullptr returned by operator new")
+
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT
 #undef BENIGN_LANGOPT
