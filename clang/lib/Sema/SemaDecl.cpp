@@ -15572,7 +15572,12 @@ void Sema::AddKnownFunctionAttributesForReplaceableGlobalAllocationFunction(
   //   indicates failure by returning a null pointer value. Any other allocation
   //   function never returns a null pointer value and indicates failure only by
   //   throwing an exception [...]
-  if (!IsNothrow && !FD->hasAttr<ReturnsNonNullAttr>())
+  //
+  // -fcheck-new overwrites this behavior to always check for NULL. Check for
+  // the CheckNew option here.
+  if (!IsNothrow &&
+      !FD->hasAttr<ReturnsNonNullAttr>() &&
+      !Context.getLangOpts().CheckNew)
     FD->addAttr(ReturnsNonNullAttr::CreateImplicit(Context, FD->getLocation()));
 
   // C++2a [basic.stc.dynamic.allocation]p2:

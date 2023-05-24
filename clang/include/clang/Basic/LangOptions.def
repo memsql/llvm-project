@@ -454,6 +454,8 @@ VALUE_LANGOPT(FuchsiaAPILevel, 32, 0, "Fuchsia API level")
 // on large _BitInts.
 BENIGN_VALUE_LANGOPT(MaxBitIntWidth, 32, 128, "Maximum width of a _BitInt")
 
+LANGOPT(CheckNew, 1, 0, "Check for nullptr returned by operator new")
+
 #undef LANGOPT
 #undef COMPATIBLE_LANGOPT
 #undef BENIGN_LANGOPT

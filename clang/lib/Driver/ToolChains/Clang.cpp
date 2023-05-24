@@ -6394,6 +6394,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.addOptOutFlag(CmdArgs, options::OPT_fassume_sane_operator_new,
                      options::OPT_fno_assume_sane_operator_new);
 
+  // -fcheck-new is off by default.
+  if (Args.hasFlag(options::OPT_fcheck_new,
+                   options::OPT_fno_check_new, false))
+    CmdArgs.push_back("-fcheck-new");
+
   // -fblocks=0 is default.
   if (Args.hasFlag(options::OPT_fblocks, options::OPT_fno_blocks,
                    TC.IsBlocksDefault()) ||
@@ -6664,6 +6669,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // C++ "sane" operator new.
   Args.addOptOutFlag(CmdArgs, options::OPT_fassume_sane_operator_new,
                      options::OPT_fno_assume_sane_operator_new);
+
+  // -fcheck-new is off by default.
+  if (Args.hasFlag(options::OPT_fcheck_new,
+                   options::OPT_fno_check_new, false))
+    CmdArgs.push_back("-fcheck-new");
 
   // -frelaxed-template-template-args is off by default, as it is a severe
   // breaking change until a corresponding change to template partial ordering
