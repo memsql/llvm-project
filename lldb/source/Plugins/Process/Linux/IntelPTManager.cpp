@@ -145,7 +145,12 @@ static Error CheckPsbPeriod(size_t psb_period) {
 }
 
 size_t IntelPTThreadTrace::GetTraceBufferSize() const {
-  return m_mmap_meta->aux_size;
+  // https://www.mail-archive.com/lldb-dev@lists.llvm.org/msg09087.html
+  #ifndef PERF_ATTR_SIZE_VER5
+    llvm_unreachable("Intel PT Linux perf event not supported");
+  #else
+    return m_mmap_meta->aux_size;
+  #endif
 }
 
 static Expected<uint64_t>
