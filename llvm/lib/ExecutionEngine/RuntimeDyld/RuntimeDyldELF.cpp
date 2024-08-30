@@ -1130,7 +1130,7 @@ void RuntimeDyldELF::resolveExternalTLSSymbols()
     RelocationList &Relocs = i->second;
     assert(Name.size() != 0 && "TLS relocations should not be absolute.");
 
-    TLSSymbolInfoELF Value = SR->findTLSSymbolELF(Name);
+    TLSSymbolInfoELF Value = SR->findTLSSymbolELF(Name.str());
     for (unsigned idx = 0, e = Relocs.size(); idx != e; ++idx) {
       const RelocationEntry &RE = Relocs[idx];
       // Ignore relocations for sections that were not loaded
