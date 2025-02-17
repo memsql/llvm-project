@@ -250,7 +250,7 @@ protected:
   JITSymbolResolver &Resolver;
 
   // The symbol resolver to use for external TLS symbols.
-  std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver;
+  RuntimeDyld::TLSSymbolResolver *TLSResolver;
 
   // Attached RuntimeDyldChecker instance. Null if no instance attached.
   RuntimeDyldCheckerImpl *Checker;
@@ -486,8 +486,8 @@ protected:
 public:
   RuntimeDyldImpl(RuntimeDyld::MemoryManager &MemMgr,
                   JITSymbolResolver &Resolver,
-                  std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver)
-    : MemMgr(MemMgr), Resolver(Resolver), TLSResolver(std::move(TLSResolver)), Checker(nullptr),
+                  RuntimeDyld::TLSSymbolResolver *TLSResolver)
+    : MemMgr(MemMgr), Resolver(Resolver), TLSResolver(TLSResolver), Checker(nullptr),
       ProcessAllSections(false), HasError(false) {
   }
 

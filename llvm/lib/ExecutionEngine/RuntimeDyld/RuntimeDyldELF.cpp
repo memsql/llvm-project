@@ -222,8 +222,8 @@ namespace llvm {
 
 RuntimeDyldELF::RuntimeDyldELF(RuntimeDyld::MemoryManager &MemMgr,
                                JITSymbolResolver &Resolver,
-                               std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver)
-    : RuntimeDyldImpl(MemMgr, Resolver, std::move(TLSResolver)),
+                               RuntimeDyld::TLSSymbolResolver *TLSResolver)
+    : RuntimeDyldImpl(MemMgr, Resolver, TLSResolver),
       GOTSectionID(0), CurrentGOTIndex(0) {}
 RuntimeDyldELF::~RuntimeDyldELF() {}
 
@@ -242,10 +242,10 @@ std::unique_ptr<RuntimeDyldELF>
 llvm::RuntimeDyldELF::create(Triple::ArchType Arch,
                              RuntimeDyld::MemoryManager &MemMgr,
                              JITSymbolResolver &Resolver,
-                             std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver) {
+                             RuntimeDyld::TLSSymbolResolver *TLSResolver) {
   switch (Arch) {
   default:
-    return std::make_unique<RuntimeDyldELF>(MemMgr, Resolver, std::move(TLSResolver));
+    return std::make_unique<RuntimeDyldELF>(MemMgr, Resolver, TLSResolver);
   case Triple::mips:
   case Triple::mipsel:
   case Triple::mips64:
@@ -1053,7 +1053,7 @@ void RuntimeDyldELF::resolveRelocationTLS(const RelocationEntry &RE,
 
 void RuntimeDyldELF::resolveExternalTLSSymbols()
 {
-  const TLSSymbolResolverELF *SR = static_cast<const TLSSymbolResolverELF*>(TLSResolver.get());
+  TLSSymbolResolverELF *SR = (TLSSymbolResolverELF *)TLSResolver;
 
   while (!ExternalTLSRelocations.empty()) {
     StringMap<RelocationList>::iterator i = ExternalTLSRelocations.begin();
@@ -1276,7 +1276,7 @@ RuntimeDyldELF::processRelocationRef(
   }
 
   uint64_t Offset = RelI->getOffset();
-  const TLSSymbolResolverELF *TLSSR = static_cast<const TLSSymbolResolverELF*>(TLSResolver.get());
+  TLSSymbolResolverELF *TLSSR = (TLSSymbolResolverELF *)TLSResolver;
 
   LLVM_DEBUG(dbgs() << "\t\tSectionID: " << SectionID << " Offset: " << Offset
                     << "\n");

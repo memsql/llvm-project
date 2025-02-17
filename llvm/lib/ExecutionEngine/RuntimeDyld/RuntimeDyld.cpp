@@ -1147,7 +1147,7 @@ void RuntimeDyldImpl::applyExternalSymbolRelocations(
       resolveExternalTLSSymbols();
   }
 }
-#pragma clang optimize off
+
 Error RuntimeDyldImpl::resolveExternalSymbols() {
   StringMap<JITEvaluatedSymbol> ExternalSymbolMap;
 
@@ -1203,7 +1203,6 @@ Error RuntimeDyldImpl::resolveExternalSymbols() {
 
   return Error::success();
 }
-#pragma clang optimize on
 
 void RuntimeDyldImpl::finalizeAsync(
     std::unique_ptr<RuntimeDyldImpl> This,
@@ -1304,10 +1303,9 @@ createRuntimeDyldELF(Triple::ArchType Arch, RuntimeDyld::MemoryManager &MM,
                      RuntimeDyld::NotifyStubEmittedFunction NotifyStubEmitted) {
   LegacyJITSymbolResolver *SR = dynamic_cast<LegacyJITSymbolResolver*>(&Resolver);
   assert(SR != nullptr);
-  std::unique_ptr<RuntimeDyld::TLSSymbolResolver> TLSResolver =
-          std::make_unique<TLSSymbolResolverGLibCELF>(SR);
+  RuntimeDyld::TLSSymbolResolver *TLSResolver = new TLSSymbolResolverGLibCELF(SR);
   std::unique_ptr<RuntimeDyldELF> Dyld =
-      RuntimeDyldELF::create(Arch, MM, Resolver, std::move(TLSResolver));
+      RuntimeDyldELF::create(Arch, MM, Resolver, TLSResolver);
   Dyld->setProcessAllSections(ProcessAllSections);
   Dyld->setNotifyStubEmitted(std::move(NotifyStubEmitted));
   return Dyld;
