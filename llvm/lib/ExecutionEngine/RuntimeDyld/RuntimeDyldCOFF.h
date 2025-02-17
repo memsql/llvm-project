@@ -37,7 +37,7 @@ public:
 protected:
   RuntimeDyldCOFF(RuntimeDyld::MemoryManager &MemMgr,
                   JITSymbolResolver &Resolver)
-    : RuntimeDyldImpl(MemMgr, Resolver, nullptr) {}
+    : RuntimeDyldImpl(MemMgr, Resolver) {}
   uint64_t getSymbolOffset(const SymbolRef &Sym);
 };
 

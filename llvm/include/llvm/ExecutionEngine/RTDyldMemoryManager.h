@@ -24,7 +24,6 @@
 namespace llvm {
 
 class ExecutionEngine;
-class RuntimeDyld;
 
 namespace object {
   class ObjectFile;

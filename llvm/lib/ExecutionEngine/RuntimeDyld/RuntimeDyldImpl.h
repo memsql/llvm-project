@@ -249,12 +249,6 @@ protected:
   // The symbol resolver to use for external symbols.
   JITSymbolResolver &Resolver;
 
-  // The symbol resolver to use for external TLS symbols.
-  RuntimeDyld::TLSSymbolResolver *TLSResolver;
-
-  // Attached RuntimeDyldChecker instance. Null if no instance attached.
-  RuntimeDyldCheckerImpl *Checker;
-
   // A list of all sections emitted by the dynamic linker.  These sections are
   // referenced in the code by means of their index in this list - SectionID.
   typedef SmallVector<SectionEntry, 64> SectionList;
@@ -288,10 +282,6 @@ protected:
   // external when they aren't found in the global symbol table of all loaded
   // modules.  This map is indexed by symbol name.
   StringMap<RelocationList> ExternalSymbolRelocations;
-
-  // We separate out external relocations to TLS symbols so we can process
-  // them all in one go.
-  StringMap<RelocationList> ExternalTLSRelocations;
 
 
   typedef std::map<RelocationValueRef, uintptr_t> StubMap;
@@ -411,10 +401,7 @@ protected:
 
   // Add a relocation entry that uses the given symbol.  This symbol may
   // be found in the global symbol table, or it may be external.
-  // Also indicate whether processing this relocation will require dealing
-  // with thread local storage.
-  void addRelocationForSymbol(const RelocationEntry &RE, StringRef SymbolName,
-    bool isTLS = false);
+  void addRelocationForSymbol(const RelocationEntry &RE, StringRef SymbolName);
 
   /// Emits long jump instruction to Addr.
   /// \return Pointer to the memory area for emitting target address.
@@ -442,16 +429,6 @@ protected:
 
   /// Resolve relocations to external symbols.
   Error resolveExternalSymbols();
-  /// \brief Resolve TLS relocations to external symbols
-  ///
-  /// This is split out from resolveExternalSymbols, because unlike regular symbols
-  /// TLS symbols do not require just an address but have an object-file specific
-  /// representation.
-  virtual void resolveExternalTLSSymbols() {};
-
-  /// \brief Update GOT entries for external symbols.
-  // The base class does nothing.  ELF overrides this.
-  virtual void updateGOTEntries(StringRef Name, uint64_t Addr) {}
 
   // Compute an upper bound of the memory that is required to load all
   // sections
@@ -485,9 +462,8 @@ protected:
 
 public:
   RuntimeDyldImpl(RuntimeDyld::MemoryManager &MemMgr,
-                  JITSymbolResolver &Resolver,
-                  RuntimeDyld::TLSSymbolResolver *TLSResolver)
-    : MemMgr(MemMgr), Resolver(Resolver), TLSResolver(TLSResolver), Checker(nullptr),
+                  JITSymbolResolver &Resolver)
+    : MemMgr(MemMgr), Resolver(Resolver),
       ProcessAllSections(false), HasError(false) {
   }
 
