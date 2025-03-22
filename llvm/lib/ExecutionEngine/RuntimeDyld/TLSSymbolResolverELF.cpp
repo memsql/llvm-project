@@ -34,7 +34,11 @@ typedef struct tcb_t {
 
 inline uint64_t GetTLSBase() {
   uint64_t tls_base;
+#ifdef __x86_64__
   asm ("movq %%fs:0, %0" : "=r" (tls_base));
+#elif defined(__aarch64__)
+  asm ("mrs %0, TPIDR_EL0" : "=r" (tls_base));
+#endif
   return tls_base;
 }
 

@@ -365,6 +365,57 @@ void RuntimeDyldELF::resolveX86_64RelocationTLS(const SectionEntry &Section, uin
   }
 }
 
+void RuntimeDyldELF::resolveAArch64RelocationTLS(const SectionEntry &Section, uint64_t Offset,
+                                                       RuntimeDyldELF::TLSSymbolInfoELF Value,
+                                                       uint32_t Type)
+{
+
+  uint32_t *TargetPtr =
+      reinterpret_cast<uint32_t *>(Section.getAddressWithOffset(Offset));
+  // Copy-pasta'd from RuntimeDyldELF::resolveAArch64RelocationTLS
+  // Data should use target endian. Code should always use little endian.
+  bool isBE = Arch == Triple::aarch64_be;
+
+  switch (Type) {
+    default:
+        llvm_unreachable("TLS Relocation type not implemented yet!");
+        break;
+    // case ELF::R_X86_64_DTPMOD64:
+    // case ELF::R_AARCH64_TLS_DTPMOD:
+    // TODO: 
+    case ELF::R_AARCH64_TLSLE_ADD_TPREL_HI12: {
+
+        // https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#57relocation
+        // OPERATION: X = TPREL(S + A)
+        // Where
+        // - S is the address of the symbol
+        // - A is the addend for relocation
+        // - X is the result of the operation
+        // - TPREL(S + A) is the operation which resolves resolves to the offset from the current 
+        // thread pointer (TP) of the thread local variable located at offset A from thread-local 
+        // symbol S.
+        // 
+        // Set target to be bits [23:12] of X
+        // Check 0 <= x < 2^24
+        //
+        // Value.getExecOffset() is the offset from TPIDR_EL0 (Thread base on aarch64)
+        uint64_t Result = Value.getExecOffset();
+        assert(static_cast<int64_t>(Result) >= 0 && Result < 0x1000000u);
+        write(isBE, TargetPtr, Result & 0xfff000U);
+        break;
+  }
+    case ELF::R_AARCH64_TLSLE_ADD_TPREL_LO12: {
+        // OPERATION: TPREL(S + A)
+        // bits 11:0 of x, check 0 <= x < 2^12
+        uint64_t Result = Value.getExecOffset();
+        assert(static_cast<int64_t>(Result) >= 0 && Result < 0x1000u);
+        write(isBE, TargetPtr, Result & 0xfffU);
+        break;
+  }
+    break;
+  }
+}
+
 void RuntimeDyldELF::resolveX86Relocation(const SectionEntry &Section,
                                           uint64_t Offset, uint32_t Value,
                                           uint32_t Type, int32_t Addend) {
@@ -1044,6 +1095,9 @@ void RuntimeDyldELF::resolveRelocationTLS(const RelocationEntry &RE,
   switch (Arch) {
   case Triple::x86_64:
     resolveX86_64RelocationTLS(Section,RE.Offset,Value,RE.RelType);
+    break;
+  case Triple::aarch64:
+    resolveAArch64RelocationTLS(Section,RE.Offset,Value,RE.RelType);
     break;
   default:
     llvm_unreachable("TLS Support not implemented for this CPU type");
