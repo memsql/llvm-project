@@ -365,6 +365,52 @@ void RuntimeDyldELF::resolveX86_64RelocationTLS(const SectionEntry &Section, uin
   }
 }
 
+void RuntimeDyldELF::resolveAArch64RelocationTLS(const SectionEntry &Section, uint64_t Offset,
+                                                       RuntimeDyldELF::TLSSymbolInfoELF Value,
+                                                       uint32_t Type, int64_t Addend)
+{
+  uint32_t *TargetPtr =
+      reinterpret_cast<uint32_t *>(Section.getAddressWithOffset(Offset));
+
+  switch (Type) {
+  default:
+    llvm_unreachable("TLS Relocation type not implemented yet!");
+    break;
+    // From https://maskray.me/blog/2021-02-14-all-about-thread-local-storage:
+    // For local-exec on aarch64 and -mtls-size=24 (default), we only need to handle
+    // R_TLSE_ADD_TPREL_HI12 and R_AARCH64_TLSLE_ADD_TPREL_LO12_NC.
+    //
+    // Read here for info on -mtls-size: https://developer.arm.com/documentation/101754/0624/armclang-Reference/armclang-Command-line-Options/-mtls-size.
+    //
+    // See https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#57relocation
+    // for a description of the relocation operations.
+    //
+    // ExecOffset() is calculated in TLSSymbolResolverGLibCELF::findTLSSymbol as an offset
+    // from the symbol found via dlsym() to the thread pointer set by glibc.
+    // The relocation from the offset is handled in the same way that lld handles it.
+    // See AArch64::relocateOne in lld/ELF/Arch/AArch64.cpp.
+  case ELF::R_AARCH64_TLSLE_ADD_TPREL_HI12: {
+      uint64_t Result = Value.getExecOffset();
+      assert(static_cast<int64_t>(Result) >= 0 && Result < 0x1000000u);
+      or32AArch64Imm(TargetPtr, getBits(Result, 12, 23));
+      break;
+  }
+  case ELF::R_AARCH64_TLSLE_ADD_TPREL_LO12_NC: {
+      uint64_t Result = Value.getExecOffset() + Addend;
+      or32AArch64Imm(TargetPtr, getBits(Result, 0, 11));
+      break;
+  }
+  // Error on the other local-exec relocations for other values of -mtls-size
+  // for the sake of completeness.
+  case ELF::R_AARCH64_TLSLE_ADD_TPREL_LO12:
+  case ELF::R_AARCH64_TLSLE_MOVW_TPREL_G1:
+  case ELF::R_AARCH64_TLSLE_MOVW_TPREL_G0_NC:
+  case ELF::R_AARCH64_TLSLE_MOVW_TPREL_G2:
+  case ELF::R_AARCH64_TLSLE_MOVW_TPREL_G1_NC:
+    llvm_unreachable("TLS Relocation type not implemented yet when -mtls-size does not equal 24");
+  }
+}
+
 void RuntimeDyldELF::resolveX86Relocation(const SectionEntry &Section,
                                           uint64_t Offset, uint32_t Value,
                                           uint32_t Type, int32_t Addend) {
@@ -1045,6 +1091,9 @@ void RuntimeDyldELF::resolveRelocationTLS(const RelocationEntry &RE,
   case Triple::x86_64:
     resolveX86_64RelocationTLS(Section,RE.Offset,Value,RE.RelType);
     break;
+  case Triple::aarch64:
+    resolveAArch64RelocationTLS(Section,RE.Offset,Value,RE.RelType, RE.Addend);
+    break;
   default:
     llvm_unreachable("TLS Support not implemented for this CPU type");
     break;
@@ -1054,7 +1103,6 @@ void RuntimeDyldELF::resolveRelocationTLS(const RelocationEntry &RE,
 void RuntimeDyldELF::resolveExternalTLSSymbols()
 {
   const TLSSymbolResolverELF *SR = static_cast<const TLSSymbolResolverELF*>(TLSResolver.get());
-
   while (!ExternalTLSRelocations.empty()) {
     StringMap<RelocationList>::iterator i = ExternalTLSRelocations.begin();
     StringRef Name = i->first();
@@ -1294,6 +1342,25 @@ RuntimeDyldELF::processRelocationRef(
       uint64_t GOTOffset = findOrAllocGOTEntry(Value, ELF::R_AARCH64_ABS64);
       resolveGOTOffsetRelocation(SectionID, Offset, GOTOffset + Addend,
                                  ELF::R_AARCH64_LDST64_ABS_LO12_NC);
+    } else if (RelType == ELF::R_AARCH64_TLSLE_ADD_TPREL_HI12) {
+      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend, Value.Offset);
+      if (Value.SymbolName)
+        addRelocationForSymbol(RE, Value.SymbolName, true);
+      else
+        addRelocationForSection(RE, Value.SectionID);
+    } else if (RelType == ELF::R_AARCH64_TLSLE_ADD_TPREL_LO12_NC) {
+      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend, Value.Offset);
+      if (Value.SymbolName)
+        addRelocationForSymbol(RE, Value.SymbolName, true);
+      else
+        addRelocationForSection(RE, Value.SectionID);
+    } else if (RelType >= ELF::R_AARCH64_TLSLE_MOVW_TPREL_G2 && RelType <= ELF::R_AARCH64_TLSLE_ADD_TPREL_LO12_NC) {
+      // Handle the other local-exec relocations for the save of completeness.
+      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend, Value.Offset);
+      if (Value.SymbolName)
+        addRelocationForSymbol(RE, Value.SymbolName, true);
+      else
+        addRelocationForSection(RE, Value.SectionID);
     } else {
       processSimpleRelocation(SectionID, Offset, RelType, Value);
     }
