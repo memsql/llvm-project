@@ -75,6 +75,9 @@ private:
   void resolveAArch64Relocation(const SectionEntry &Section, uint64_t Offset,
                                 uint64_t Value, uint32_t Type, int64_t Addend);
 
+  void resolveAArch64RelocationTLS(const SectionEntry &Section, uint64_t Offset,
+                               TLSSymbolInfoELF Value, uint32_t Type, int64_t Addend);
+
   bool resolveAArch64ShortBranch(unsigned SectionID, relocation_iterator RelI,
                                  const RelocationValueRef &Value);
 

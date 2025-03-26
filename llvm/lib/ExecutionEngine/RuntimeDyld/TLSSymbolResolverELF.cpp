@@ -34,7 +34,11 @@ typedef struct tcb_t {
 
 inline uint64_t GetTLSBase() {
   uint64_t tls_base;
+#ifdef __x86_64__
   asm ("movq %%fs:0, %0" : "=r" (tls_base));
+#elif defined(__aarch64__)
+  asm ("mrs %0, TPIDR_EL0" : "=r" (tls_base));
+#endif
   return tls_base;
 }
 
@@ -47,7 +51,6 @@ TLSSymbolResolverGLibCELF::findTLSSymbol(const std::string &Name) const {
     // is sketchy because it just searches through all the modules
     // and sees which one is closest, but at least it only relies on
     // the libc ABI, which should be stable.
-    const void  *UnallocatedDTVSlot = (void *)-1l;
 
     // First ask the MemoryManager to dlsym this value for us
     auto Sym = SR->findSymbol(Name);
@@ -56,6 +59,19 @@ TLSSymbolResolverGLibCELF::findTLSSymbol(const std::string &Name) const {
         handleAllErrors(Addr.takeError());
 
     uint64_t Value = Addr.get();
+
+    // Only enable this on x86_64, as this code was made for x86_64. This was
+    // from the initial diff to LLVM that never landed. We only need to handle
+    // local-exec, so we don't need this.
+    //
+    // This is also non-trivial to handle on aarch64.
+    // There are two variants of thread-local data structures:
+    // https://uclibc.org/docs/tls.pdf. x86_64 is variant II, but aarch64 is
+    // variant I. This means that on aarch64, the TCB is at the end DTV whereas
+    // it is at the begining on x86_64. Also, the offset of the DTV from the TCB
+    // seems to be inconsistent based off the implementation.
+#ifdef __x86_64__
+    const void  *UnallocatedDTVSlot = (void *)-1l;
 
     // This is glibc specifc but followed by a number of other C libraries
     tcb_t *tcb = (tcb_t *)pthread_self();
@@ -82,15 +98,20 @@ TLSSymbolResolverGLibCELF::findTLSSymbol(const std::string &Name) const {
       }
     }
     assert(found_i != 0 && "Value could not be found in thread local storage");
+#endif
 
     // Note: If this TLS symbol is not defined by the main application,
     // exec_distance will be some invalid garbage value.
     uint64_t tls_base = GetTLSBase();
     int64_t exec_distance = static_cast<int64_t>(Value - tls_base);
 
+#ifdef __x86_64__
     RuntimeDyldELF::TLSSymbolInfoELF::ModuleInfo mod(found_i,
         (uint64_t)dtv[found_i].pointer.val - (uint64_t)tcb);
     return RuntimeDyldELF::TLSSymbolInfoELF(mod, found_offset, exec_distance).getOpaque();
+#elif defined(__aarch64__)
+    return RuntimeDyldELF::TLSSymbolInfoELF(RuntimeDyldELF::TLSSymbolInfoELF::ModuleInfo(0, 0), 0, exec_distance).getOpaque();
+#endif
 }
 
 }
