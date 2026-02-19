@@ -566,6 +566,7 @@ macro(add_custom_libcxx name prefix)
   set_target_properties(${name}-clobber PROPERTIES FOLDER "Compiler-RT Misc")
 
   set(PASSTHROUGH_VARIABLES
+    CMAKE_POLICY_VERSION_MINIMUM
     CMAKE_C_COMPILER_TARGET
     CMAKE_CXX_COMPILER_TARGET
     CMAKE_SHARED_LINKER_FLAGS

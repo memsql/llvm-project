@@ -67,6 +67,7 @@ function(llvm_create_cross_target project_name target_name toolchain buildtype)
 
   add_custom_command(OUTPUT ${${project_name}_${target_name}_BUILD}/CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}"
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DCMAKE_MAKE_PROGRAM="${CMAKE_MAKE_PROGRAM}"
         ${CROSS_TOOLCHAIN_FLAGS_${target_name}} ${CMAKE_SOURCE_DIR}
         ${CROSS_TOOLCHAIN_FLAGS_${project_name}_${target_name}}
