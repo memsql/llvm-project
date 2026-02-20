@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <cstdint>
 
 namespace __orc_rt {
 
