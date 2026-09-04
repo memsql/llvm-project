@@ -1,0 +1,53 @@
+# RUN: llc -mtriple=x86_64-unknown-linux-gnu -run-pass=branch-folder \
+# RUN:     -verify-machineinstrs -o - %s | FileCheck %s
+#
+# bb.1 and bb.2 share a trailing JCC_1 %bb.4, so tail merging retires bb.1's
+# copy and branches to bb.2 instead. The earlier JCC_1 %bb.4 stays in bb.1, so
+# %bb.4 must stay a successor of bb.1. Dropping it left the branch pointing at
+# a block that is no longer in the CFG, which printed as %bb.-1.
+
+--- |
+  define i32 @jcc_prefix() { ret i32 0 }
+...
+---
+name:            jcc_prefix
+tracksRegLiveness: true
+body:             |
+  ; CHECK-LABEL: name: jcc_prefix
+  bb.0:
+    successors: %bb.1, %bb.2
+    liveins: $eax
+
+    TEST32rr $eax, $eax, implicit-def $eflags
+    JCC_1 %bb.1, 4, implicit $eflags
+    JMP_1 %bb.2
+
+  ; CHECK:      bb.1:
+  ; CHECK-NEXT:   successors: %bb.4({{[^)]+}}), %bb.2({{[^)]+}})
+  ; CHECK:        JCC_1 %bb.4, 5
+  bb.1:
+    successors: %bb.4, %bb.3
+    liveins: $eflags
+
+    JCC_1 %bb.4, 5, implicit $eflags
+    JCC_1 %bb.4, 10, implicit $eflags
+    JMP_1 %bb.3
+
+  ; CHECK:      bb.2:
+  ; CHECK-NEXT:   successors: %bb.4({{[^)]+}}), %bb.3({{[^)]+}})
+  ; CHECK:        JCC_1 %bb.4, 10
+  bb.2:
+    successors: %bb.4, %bb.3
+    liveins: $eflags
+
+    JCC_1 %bb.4, 10, implicit $eflags
+    JMP_1 %bb.3
+
+  bb.3:
+    $eax = MOV32ri 1
+    RET 0, $eax
+
+  bb.4:
+    $eax = MOV32ri 2
+    RET 0, $eax
+...

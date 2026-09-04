@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/TargetInstrInfo.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/MachineScheduler.h"
@@ -125,16 +128,38 @@ unsigned TargetInstrInfo::getInlineAsmLength(
   return Length;
 }
 
-/// ReplaceTailWithBranchTo - Delete the instruction OldInst and everything
+/// Collect successors remaining instructions still name: direct MBB operands
+/// and jump-table destinations. Fall-through has no operand; after this
+/// rewrite it is always NewDest, which the caller keeps separately.
+///
+/// Returns true if MBB still contains an indirect branch. Its possible targets
+/// were recorded on the CFG during ISel and no operand names them, so with one
+/// present no edge of this block can be shown dead.
+static bool
+collectExplicitSuccessors(MachineBasicBlock &MBB,
+                          SmallPtrSetImpl<MachineBasicBlock *> &Succs) {
+  const MachineJumpTableInfo *MJTI = MBB.getParent()->getJumpTableInfo();
+  bool HasIndirectBranch = false;
+  for (const MachineInstr &MI : MBB.instrs()) {
+    HasIndirectBranch |= MI.isIndirectBranch();
+    for (const MachineOperand &MO : MI.operands()) {
+      if (MO.isMBB())
+        Succs.insert(MO.getMBB());
+      else if (MO.isJTI() && MJTI)
+        for (MachineBasicBlock *Dest :
+             MJTI->getJumpTables()[MO.getIndex()].MBBs)
+          Succs.insert(Dest);
+    }
+  }
+  return HasIndirectBranch;
+}
+
+/// ReplaceTailWithBranchTo - Delete the instruction Tail and everything
 /// after it, replacing it with an unconditional branch to NewDest.
 void
 TargetInstrInfo::ReplaceTailWithBranchTo(MachineBasicBlock::iterator Tail,
                                          MachineBasicBlock *NewDest) const {
   MachineBasicBlock *MBB = Tail->getParent();
-
-  // Remove all the old successors of MBB from the CFG.
-  while (!MBB->succ_empty())
-    MBB->removeSuccessor(MBB->succ_begin());
 
   // Save off the debug loc before erasing the instruction.
   DebugLoc DL = Tail->getDebugLoc();
@@ -148,10 +173,28 @@ TargetInstrInfo::ReplaceTailWithBranchTo(MachineBasicBlock::iterator Tail,
     MBB->erase(MI);
   }
 
-  // If MBB isn't immediately before MBB, insert a branch to it.
+  // If MBB isn't immediately before NewDest, insert a branch to it.
   if (++MachineFunction::iterator(MBB) != MachineFunction::iterator(NewDest))
     insertBranch(*MBB, NewDest, nullptr, SmallVector<MachineOperand, 0>(), DL);
-  MBB->addSuccessor(NewDest);
+
+  // Retire edges that only the deleted tail used.
+  // If an indirect branch is present in the prefix, we do not have the information
+  // on what its possible targets are. Thus no edge of this block are removed
+  SmallPtrSet<MachineBasicBlock *, 4> LiveSuccs;
+  if (!collectExplicitSuccessors(*MBB, LiveSuccs)) {
+    SmallVector<MachineBasicBlock *, 4> OldSuccs(MBB->succ_begin(),
+                                                 MBB->succ_end());
+    for (MachineBasicBlock *Succ : OldSuccs) {
+      if (Succ == NewDest || Succ->isEHPad() || LiveSuccs.count(Succ))
+        continue;
+      MBB->replaceSuccessor(Succ, NewDest);
+    }
+  }
+
+  if (!MBB->isSuccessor(NewDest))
+    MBB->addSuccessor(NewDest);
+
+  MBB->normalizeSuccProbs();
 }
 
 MachineInstr *TargetInstrInfo::commuteInstructionImpl(MachineInstr &MI,

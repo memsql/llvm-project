@@ -747,8 +747,11 @@ public:
     llvm_unreachable("Target didn't implement ReduceLoopCount");
   }
 
-  /// Delete the instruction OldInst and everything after it, replacing it with
+  /// Delete the instruction Tail and everything after it, replacing it with
   /// an unconditional branch to NewDest. This is used by the tail merging pass.
+  /// Successors still named by remaining instructions, plus EH pads, are kept;
+  /// only edges that the deleted tail alone used are retargeted to NewDest.
+  /// If MBB still contains an indirect branch, every existing successor is kept.
   virtual void ReplaceTailWithBranchTo(MachineBasicBlock::iterator Tail,
                                        MachineBasicBlock *NewDest) const;
 
